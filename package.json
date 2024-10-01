@@ -1,0 +1,14 @@
+{
+  "name": "budget-agario",
+  "version": "1.0.0",
+  "description": "Agar.io but on a budget",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "author": "kqwq",
+  "license": "ISC",
+  "dependencies": {
+    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.48.0"
+  }
+}
