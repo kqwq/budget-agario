@@ -33,15 +33,19 @@ const tools = {
         b = Math.floor((b + m) * 255).toString(16).padStart(2, '0');
         return `#${r}${g}${b}`;
     },
-    lerpColor: (a, b, amount) => {
-        const ah = parseInt(a.replace(/#/g, ''), 16),
-            ar = ah >> 16, ag = ah >> 8 & 0xff, ab = ah & 0xff,
-            bh = parseInt(b.replace(/#/g, ''), 16),
-            br = bh >> 16, bg = bh >> 8 & 0xff, bb = bh & 0xff,
-            rr = ar + amount * (br - ar),
-            rg = ag + amount * (bg - ag),
-            rb = ab + amount * (bb - ab);
-        return '#' + ((1 << 24) + (rr << 16) + (rg << 8) + rb).toString(16).slice(1);
+    lerpColor: (aIn, bIn, amount) => {
+        const aHex = parseInt(aIn.slice(1), 16);
+        const bHex = parseInt(bIn.slice(1), 16);
+        const r1 = aHex >> 16;
+        const g1 = aHex >> 8 & 0xFF;
+        const b1 = aHex & 0xFF;
+        const r2 = bHex >> 16;
+        const g2 = bHex >> 8 & 0xFF;
+        const b2 = bHex & 0xFF;
+        const r = Math.round(r1 + (r2 - r1) * amount);
+        const g = Math.round(g1 + (g2 - g1) * amount);
+        const b = Math.round(b1 + (b2 - b1) * amount);
+        return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
     },
     rantInt: (min, max) => {
         return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -50,11 +54,16 @@ const tools = {
 
 
 class Food {
-    constructor(x, y, mass=1) {
+    constructor(id, x, y, mass=1) {
+        this.id = id;
         this.x = x;
         this.y = y;
         this.mass = mass;
         this.color = tools.randFullSaturationColor();
+    }
+
+    getRadius() {
+        return 1;
     }
 
     draw(ctx, X, Y, S) {
@@ -69,7 +78,7 @@ class Food {
 
 
 class Player {
-    constructor(name, id=Math.random(), mass=10, x=0, y=0) {
+    constructor(name, id=Math.random(), x=0, mass=10, y=0, color=undefined) {
         this.name = name;
         this.id = id;
         this.mass = mass;
@@ -78,14 +87,28 @@ class Player {
         this.velX = 0;
         this.velY = 0;
         this.score = 0;
-        this.color = tools.randFullSaturationColor();
-        this.outline = tools.lerpColor(this.color, '#000000', 0.1);
+        this.color = color ?? tools.randFullSaturationColor();
+        this.outline = tools.lerpColor(this.color, '#000000', 0.25);
         this.direction = 0;
         this.speed = 0;
     }
 
     getMaxSpeed() {
-        return (1/this.mass) * 3;
+        return (1/Math.sqrt(this.mass)) * 2;
+    }
+    getRadius() {
+        return Math.sqrt(this.mass);
+    }
+
+    repr() {
+        return {
+            name: this.name,
+            id: this.id,
+            x: this.x,
+            y: this.y,
+            mass: this.mass,
+            color: this.color
+        }
     }
 
     draw(ctx, X, Y, S) {
@@ -98,7 +121,7 @@ class Player {
         this.y += this.velY;
 
         // Draw a circle
-        const radius = Math.sqrt(this.mass / Math.PI);
+        const radius = this.getRadius();
         ctx.beginPath();
         ctx.arc(X(this.x), Y(this.y), S(radius), 0, 2 * Math.PI);
         ctx.fillStyle = this.color;
@@ -106,9 +129,10 @@ class Player {
         ctx.lineWidth = S(radius * 0.05);
         ctx.strokeStyle = this.outline;
         ctx.stroke();
-        ctx.font = `${S(1)}px Arial`;
+        ctx.font = `12px Arial`;
         ctx.fillStyle = '#000';
-        ctx.fillText(this.name, X(this.x) - S(1), Y(this.y) - S(1));
+        ctx.fillText(this.name, X(this.x) - 6, Y(this.y) - S(1));
+        ctx.fillText(this.mass, X(this.x) + 6, Y(this.y) + S(1));
     }
 }
 
@@ -120,10 +144,10 @@ class GameManager {
         this.mouse = {x: 0, y: 0, out: false};
         this.cam = {x: 0, y: 0, zoom: 20};
         this.keys = {};
-        this.socket = new WebSocket('ws://localhost:3001');
+        this.tick = 0;
     }
 
-    init(canvasContext, isDebug=true) {
+    init(canvasContext, isDebug) {
         this.ctx = canvasContext;
         const yourName = document.getElementById('name').value;
         this.you = new Player(yourName);
@@ -132,10 +156,11 @@ class GameManager {
             // Scatter food everywhere from -1000 to 1000
             const span = 400;
             for (let i = 0; i < 1000; i++) {
-                this.food.push(new Food(tools.rantInt(-span, span), tools.rantInt(-span, span)));
+                this.food.push(new Food(Math.random(), tools.rantInt(-span, span), tools.rantInt(-span, span)));
             }
             
         }
+        socket.send(JSON.stringify({ type: 'join', joiner: this.you.repr() }));
     }
     handleKeyDown(e) {
         this.keys[e.key] = true;
@@ -152,6 +177,59 @@ class GameManager {
     }
     handleMouseOut() {
         this.mouse.out = true;
+    }
+    onSocketOpen() {
+    }
+        
+    onSocketMessage(e) {
+        const data = JSON.parse(e.data);
+        // console.log(data)
+        switch (data.type) {
+            case "init-food":
+                this.food = [];
+                for (const { id, x, y } of data.state.food) {
+                    this.food.push(new Food(id, x, y));
+                }
+                break;
+            case "update-movement":
+                const player2 = this.players.find(p => p.id === data.id);
+                if (!player2) return;
+                player2.x = data.x;
+                player2.y = data.y;
+                player2.speed = data.s;
+                player2.direction = data.d;
+                break;
+            case "update-players":
+                
+                console.log('update-players', data.players, gm.players, gm.you);
+                const incomingPlayerIds = data.players.map(p => p.id);
+                for (const { name, id, x, y, mass, color } of data.players) {
+                    const p = this.players.find(p => p.id === id);
+                    
+                    if (p) {
+                        p.x = x;
+                        p.y = y;
+                        p.mass = mass;
+                        p.color = color;
+                        console.log('original')
+                    } else {
+                        this.players.push(new Player(name, id, x, mass, y, color));
+                        console.log('new')
+                    }
+                }
+                // If a player is not in the incoming list, remove it
+                this.players = this.players.filter(p => incomingPlayerIds.includes(p.id));
+                break
+            
+            case "update-eat":
+                const player = this.players.find(p => p.id === data.pid);
+                const food = this.food.find(f => f.id === data.fid);
+                player.mass += 1;
+                food.x = data.fNewX;
+                food.y = data.fNewY;
+                break;
+            }
+
     }
 
 
@@ -179,7 +257,6 @@ class GameManager {
 
     draw() {
 
-        // Update logic -> keys
         if (this.mouse.out) {
             this.you.speed *= 0.9;
         } else {
@@ -209,6 +286,21 @@ class GameManager {
         this.cam.x = this.you.x;
         this.cam.y = this.you.y;
 
+        // Update logic -> collision
+        for (const f of this.food) {
+            const chX = this.you.x - f.x;
+            const chY = this.you.y - f.y;
+            if (chX * chX + chY * chY < this.you.getRadius() * this.you.getRadius() + f.getRadius() * f.getRadius()) {
+                socket.send(JSON.stringify({ type: 'eat', pid: this.you.id, fid: f.id }));
+            }
+        }
+
+        // Socket logic
+        if (this.tick % 10 === 0) {
+            socket.send(JSON.stringify({ type: 'move', id: this.you.id, x: this.you.x, y: this.you.y, s: this.you.speed, d: this.you.direction }));
+        }
+        this.tick ++;
+
 
         // Draw logic
         this.ctx.clearRect(0, 0, innerWidth, innerHeight);
@@ -228,6 +320,18 @@ class GameManager {
 
 
 const gm = new GameManager()
+const socket = new WebSocket('ws://localhost:3001/budget-agario');
+socket.addEventListener('open', () => {
+    console.log('Connected to server');
+    gm.onSocketOpen();
+});
+socket.addEventListener('message', gm.onSocketMessage.bind(gm));
+socket.addEventListener('close', () => {
+    console.log('Disconnected from server');
+    alert('Disconnected from server');
+    // Force reload page
+    location.reload();
+});
 
 function gameLoop() {
     gm.draw();
