@@ -1,0 +1,23 @@
+
+# Create a pod to deploy a local image called "budget-agario" using ports 3000 and 3001
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ba
+  template:
+    metadata:
+      labels:
+        app: ba
+    spec:
+      containers:
+      - name: ba
+        image: kqwq/budget-agario
+        ports:
+        - containerPort: 3000
+        - containerPort: 3001

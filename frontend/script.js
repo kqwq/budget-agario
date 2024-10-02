@@ -94,7 +94,7 @@ class Player {
     }
 
     getMaxSpeed() {
-        return (1/Math.sqrt(this.mass)) * 2;
+        return (1/Math.sqrt(this.mass)) * 2.5;
     }
     getRadius() {
         return Math.sqrt(this.mass);
@@ -131,8 +131,8 @@ class Player {
         ctx.stroke();
         ctx.font = `12px Arial`;
         ctx.fillStyle = '#000';
-        ctx.fillText(this.name, X(this.x) - 6, Y(this.y) - S(1));
-        ctx.fillText(this.mass, X(this.x) + 6, Y(this.y) + S(1));
+        ctx.fillText(this.name, X(this.x), Y(this.y) - 7);
+        ctx.fillText(this.mass, X(this.x), Y(this.y) + 7);
     }
 }
 
@@ -330,7 +330,7 @@ socket.addEventListener('close', () => {
     console.log('Disconnected from server');
     alert('Disconnected from server');
     // Force reload page
-    location.reload();
+    // location.reload();
 });
 
 function gameLoop() {

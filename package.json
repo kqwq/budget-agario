@@ -4,7 +4,9 @@
   "description": "Agar.io but on a budget",
   "main": "server.mjs",
   "scripts": {
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "compose": "docker build -t kqwq/budget-agario .",
+    "dockerpush": "docker tag budget-agario:latest kqwq/budget-agario:latest && docker push kqwq/budget-agario:latest"
   },
   "author": "kqwq",
   "license": "ISC",

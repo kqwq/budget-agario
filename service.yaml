@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-service
+spec:
+  selector:
+    app: ba
+  ports:
+  - name: http
+    protocol: TCP
+    port: 3000
+    targetPort: 3000
+  - name: ws
+    protocol: TCP
+    port: 3001
+    targetPort: 3001
+  type: NodePort

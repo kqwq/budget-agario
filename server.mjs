@@ -44,9 +44,13 @@ const server = createServer(async (req, res) => {
 });
 
 // Uncomment to start the HTTP server
-// server.listen(HTTP_PORT, '127.0.0.1', () => {
-//   console.log(`Listening on 127.0.0.1:${HTTP_PORT}`);
-// });
+server.listen(HTTP_PORT, '0.0.0.0', (e) => {
+  if (e) {
+    console.error('An error occurred:', e);
+  } else {
+    console.log(`Listening to port ${HTTP_PORT}`);
+  }
+});
 
 const app = new App();
 
